@@ -20,26 +20,16 @@ To install `smtplib`, it's included in the Python standard library, so you don't
 
 1. Clone this repository to your local machine.
 
-   Windows:
+   Windows or Linux:
    ```
-   git clone https://github.com/username/repository.git
-   ```
-
-   Linux:
-   ```bash
-   git clone https://github.com/username/repository.git
+   git clone https://github.com/RocketGod-git/smsbomber.git
    ```
 
 2. Navigate to the directory where the repository is cloned.
 
-   Windows:
+   Windows or Linux:
    ```
-   cd path\to\directory
-   ```
-
-   Linux:
-   ```bash
-   cd path/to/directory
+   cd smsbomber
    ```
 
 ## Usage
@@ -48,12 +38,12 @@ To run the script, type:
 
 Windows:
 ```
-python email_script.py
+python smsbomber.py
 ```
 
 Linux:
 ```bash
-python3 email_script.py
+python3 smsbomber.py
 ```
 
 Follow the prompts to select your email provider, enter your email address and password, the target email address, the number of emails to send, and the wait time between each email.
