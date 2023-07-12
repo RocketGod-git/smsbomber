@@ -171,7 +171,6 @@ def main():
         "Amy Aviator here! You know why I don't trust stairs? They're always up to something."
     ]
 
-def main():
     try:
         email_provider, email_address, password, target_email, text_amount, wait = get_user_input()
         server = create_smtp_server(email_provider, email_address, password)
