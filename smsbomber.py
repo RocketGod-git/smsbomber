@@ -16,6 +16,7 @@ EMAIL_PROVIDERS = {
 }
 
 def get_user_input():
+    print()
     print("\033[91m")  
     print("WARNING: It is recommended to use a VPN when sending emails using this program.")
     print("This can help protect your privacy and prevent your IP address from being blocked.")
