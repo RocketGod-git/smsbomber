@@ -120,7 +120,7 @@ def checker(hostname, port):
     print(f"Checking server {hostname}...")
     try:
         server = smtplib.SMTP(hostname, port, timeout=15)
-        sender = 'newsletter@'+hostname
+        sender = 'apt69420@aol.com'  # updated line
         receiver = 'rocket@god.com'
         msg = MIMEMultipart('alternative')
         msg['From'] = sender
