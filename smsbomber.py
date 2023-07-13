@@ -12,8 +12,13 @@ import re
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 import textwrap
+import os
 
 logging.basicConfig(level=logging.DEBUG)
+
+def log_open_smtp_server(server, port):
+    with open('open_smtp_servers.log', 'a') as file:
+        file.write(f"{server}:{port}\n")
 
 def validate_email(email):
     """Check if email address is valid."""
@@ -260,6 +265,7 @@ def main():
                 executor.shutdown(wait=False)
                 return
         if found_server is not None:
+            log_open_smtp_server(found_server, port)
             server = create_smtp_server(found_server, port)
             if server is not None:
                 send_emails(server, target_email, text_amount, wait, messages)
