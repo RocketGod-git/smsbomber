@@ -13,8 +13,25 @@ import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 import textwrap
 import os
+from rich.console import Console
+from rich.table import Table
 
 logging.basicConfig(level=logging.DEBUG)
+
+console = Console()
+successful_attempts = 0
+failed_attempts = 0
+
+def print_statistics(hostname):
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Failed Attempts")
+    table.add_column("Successful Attempts")
+    table.add_column("Last Checked IP")
+
+    table.add_row(str(failed_attempts), str(successful_attempts), str(hostname))
+
+    console.clear()
+    console.print(table)
 
 def log_open_smtp_server(server, port):
     with open('open_smtp_servers.log', 'a') as file:
@@ -74,14 +91,21 @@ def get_user_input():
                 break
         except ValueError:
             print(colored("Please enter a valid integer for the SMTP port number.", 'red'))
-    hostname_or_ip = input(colored(textwrap.fill("Enter hostname or IP address (with CIDR notation for range) to scan for open SMTP relay to use. For example, '192.168.0.0/24' will scan all IPs from 192.168.0.1 to 192.168.0.254. A range like '192.168.0.0/16' will scan from 192.168.0.1 to 192.168.255.254:", 97), 'yellow'))
-    try:
-        # Attempt to interpret as an IP network
-        ip_network = ipaddress.ip_network(hostname_or_ip)
-        hostnames = [str(ip) for ip in ip_network.hosts()]
-    except ValueError:
-        # If not an IP network, interpret as a single hostname
-        hostnames = [hostname_or_ip]
+    hostname_or_ip = input(colored(textwrap.fill("Enter hostname or IP address (with CIDR notation for range) to scan for open SMTP relay to use. For example, '192.168.0.0/24' will scan all IPs from 192.168.0.1 to 192.168.0.254. A range like '192.168.0.0/16' will scan from 192.168.0.1 to 192.168.255.254. If you press enter without typing anything, it will scan the default range of 100.128.0.0 through 100.255.255.255:", 97), 'yellow'))
+
+    if hostname_or_ip == "":
+        ip_network = ipaddress.ip_network("100.128.0.0/9")
+    else:
+        try:
+            # Attempt to interpret as an IP network
+            ip_network = ipaddress.ip_network(hostname_or_ip)
+        except ValueError:
+            # If not an IP network, interpret as a single hostname
+            hostnames = [hostname_or_ip]
+            logging.debug("Exiting get_user_input function")
+            return target_email, text_amount, wait, hostnames, port
+    
+    hostnames = [str(ip) for ip in ip_network.hosts()]
     logging.debug("Exiting get_user_input function")
     return target_email, text_amount, wait, hostnames, port
 
@@ -135,6 +159,10 @@ def send_emails(server, target_email, text_amount, wait, messages):
     server.quit()
 
 def checker(hostname, port):
+    global successful_attempts
+    global failed_attempts
+
+    print_statistics(hostname)
     print(f"Checking server {hostname}...")
     try:
         server = smtplib.SMTP(hostname, port, timeout=15)
@@ -150,11 +178,13 @@ def checker(hostname, port):
         server.sendmail(sender, receiver, text)
         server.quit()
         print(f"Open SMTP relay found at {hostname}")
+        successful_attempts += 1
         return True
     except (socket.gaierror, socket.error, socket.herror, smtplib.SMTPException, TimeoutError) as e:
         logging.error(f"Failed to connect to server {hostname}. Error: {str(e)}")
+        failed_attempts += 1
         return False
-
+    
 def main():
     try:
         messages = [
