@@ -91,10 +91,12 @@ def get_user_input():
                 break
         except ValueError:
             print(colored("Please enter a valid integer for the SMTP port number.", 'red'))
-    hostname_or_ip = input(colored(textwrap.fill("Enter hostname or IP address (with CIDR notation for range) to scan for open SMTP relay to use. For example, '192.168.0.0/24' will scan all IPs from 192.168.0.1 to 192.168.0.254. A range like '192.168.0.0/16' will scan from 192.168.0.1 to 192.168.255.254. If you press enter without typing anything, it will scan the default range of 100.128.0.0 through 100.255.255.255:", 97), 'yellow'))
+    hostname_or_ip = input(colored(textwrap.fill("Enter hostname or IP address (with CIDR notation for range) to scan for open SMTP relay to use. For example, '192.168.0.0/24' will scan all IPs from 192.168.0.1 to 192.168.0.254. A range like '192.168.0.0/16' will scan from 192.168.0.1 to 192.168.255.254. If you press enter without typing anything, it will generate a random IP address range to scan:", 97), 'yellow'))
 
     if hostname_or_ip == "":
-        ip_network = ipaddress.ip_network("100.128.0.0/9")
+        # Generate two random numbers for the first two positions of the IP
+        first_two_positions = f"{random.randint(1, 255)}.{random.randint(1, 255)}"
+        ip_network = ipaddress.ip_network(f"{first_two_positions}.0.0/16")
     else:
         try:
             # Attempt to interpret as an IP network
