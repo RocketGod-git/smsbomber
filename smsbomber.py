@@ -1,3 +1,13 @@
+# __________                  __             __     ________             .___ 
+# \______   \  ____    ____  |  | __  ____ _/  |_  /  _____/   ____    __| _/ 
+#  |       _/ /  _ \ _/ ___\ |  |/ /_/ __ \\   __\/   \  ___  /  _ \  / __ |  
+#  |    |   \(  <_> )\  \___ |    < \  ___/ |  |  \    \_\  \(  <_> )/ /_/ |  
+#  |____|_  / \____/  \___  >|__|_ \ \___  >|__|   \______  / \____/ \____ |  
+#         \/              \/      \/     \/               \/              \/  
+#
+# SMS Bomber by RocketGod
+# https://github.com/RocketGod-git/smsbomber
+
 import logging
 import string
 import smtplib
@@ -15,8 +25,20 @@ import textwrap
 import os
 from rich.console import Console
 from rich.table import Table
+import requests
 
 logging.basicConfig(level=logging.DEBUG)
+
+def is_valid_proxy(proxy_ip):
+    proxies = {
+        "http": f"http://{proxy_ip}",
+        "https": f"http://{proxy_ip}"
+    }
+    try:
+        response = requests.get("https://icanhazip.com/", proxies=proxies, timeout=10)
+        return response.text.strip() == proxy_ip
+    except requests.RequestException:
+        return False
 
 console = Console()
 successful_attempts = 0
@@ -297,6 +319,10 @@ def main():
 
         # Combine previous IPs and new hostnames
         hostnames = previous_ips + hostnames
+
+        # Filter hostnames with valid proxies
+        valid_proxies = [ip for ip in hostnames if is_valid_proxy(ip)]
+        print(f"Found {len(valid_proxies)} valid proxies.")
 
         found_server = None
         with ThreadPoolExecutor(max_workers=100) as executor:
