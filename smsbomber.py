@@ -29,31 +29,14 @@ import requests
 
 logging.basicConfig(level=logging.DEBUG)
 
-def is_valid_proxy(proxy_ip):
-    proxies = {
-        "http": f"http://{proxy_ip}",
-        "https": f"http://{proxy_ip}"
-    }
+def check_smtp_server(ip, port=25):
     try:
-        response = requests.get("https://icanhazip.com/", proxies=proxies, timeout=10)
-        return response.text.strip() == proxy_ip
-    except requests.RequestException:
+        with smtplib.SMTP(ip, port, timeout=10) as server:
+            server.ehlo()
+            # Optional: Add additional relay testing logic here
+            return True
+    except (socket.gaierror, socket.error, smtplib.SMTPException):
         return False
-
-console = Console()
-successful_attempts = 0
-failed_attempts = 0
-
-def print_statistics(hostname):
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("Failed Attempts")
-    table.add_column("Successful Attempts")
-    table.add_column("Last Checked IP")
-
-    table.add_row(str(failed_attempts), str(successful_attempts), str(hostname))
-
-    console.clear()
-    console.print(table)
 
 def log_open_smtp_server(server, port):
     with open('open_smtp_servers.log', 'a') as file:
@@ -116,9 +99,13 @@ def get_user_input():
     hostname_or_ip = input(colored(textwrap.fill("Enter hostname or IP address (with CIDR notation for range) to scan for open SMTP relay to use. For example, '192.168.0.0/24' will scan all IPs from 192.168.0.1 to 192.168.0.254. A range like '192.168.0.0/16' will scan from 192.168.0.1 to 192.168.255.254. If you press enter without typing anything, it will generate a random IP address range to scan:", 97), 'yellow'))
 
     if hostname_or_ip == "":
-        # Generate two random numbers for the first two positions of the IP
-        first_two_positions = f"{random.randint(1, 255)}.{random.randint(1, 255)}"
-        ip_network = ipaddress.ip_network(f"{first_two_positions}.0.0/16")
+        while True:
+            # Generate two random numbers for the first two positions of the IP
+            first_two_positions = f"{random.randint(1, 255)}.{random.randint(1, 255)}"
+            temp_network = ipaddress.ip_network(f"{first_two_positions}.0.0/16", strict=False)
+            if not temp_network.is_private:
+                ip_network = temp_network
+                break
     else:
         try:
             # Attempt to interpret as an IP network
@@ -186,7 +173,6 @@ def checker(hostname, port):
     global successful_attempts
     global failed_attempts
 
-    print_statistics(hostname)
     print(f"Checking server {hostname}...")
     try:
         server = smtplib.SMTP(hostname, port, timeout=15)
@@ -204,11 +190,15 @@ def checker(hostname, port):
         print(f"Open SMTP relay found at {hostname}")
         successful_attempts += 1
         return True
-    except (socket.gaierror, socket.error, socket.herror, smtplib.SMTPException, TimeoutError) as e:
-        logging.error(f"Failed to connect to server {hostname}. Error: {str(e)}")
+    except Exception as e:
+        print(f"Failed to connect to server {hostname}. Error: {str(e)}")
         failed_attempts += 1
         return False
     
+console = Console()
+successful_attempts = 0
+failed_attempts = 0
+
 def main():
     try:
         messages = [
@@ -319,28 +309,28 @@ def main():
 
         # Combine previous IPs and new hostnames
         hostnames = previous_ips + hostnames
-
-        # Filter hostnames with valid proxies
-        valid_proxies = [ip for ip in hostnames if is_valid_proxy(ip)]
-        print(f"Found {len(valid_proxies)} valid proxies.")
+        print(f"Total hostnames/IPs to check: {len(hostnames)}")
 
         found_server = None
         with ThreadPoolExecutor(max_workers=100) as executor:
-            future_to_hostname = {executor.submit(checker, hostname.split(':')[0], int(hostname.split(':')[1] if ':' in hostname else port)): hostname for hostname in hostnames}
-            try:
-                for future in concurrent.futures.as_completed(future_to_hostname):
-                    hostname = future_to_hostname[future]
-                    try:
-                        if future.result():
-                            found_server = hostname.split(':')[0]
-                            port = int(hostname.split(':')[1] if ':' in hostname else port)
-                            break
-                    except Exception as exc:
-                        print('%r generated an exception: %s' % (hostname, exc))
-            except KeyboardInterrupt:
-                print("\nProgram terminated by user. Exiting...")
-                executor.shutdown(wait=False)
-                return
+            future_to_hostname = {executor.submit(check_smtp_server, hostname.split(':')[0], int(hostname.split(':')[1] if ':' in hostname else port)): hostname for hostname in hostnames}
+            for future in concurrent.futures.as_completed(future_to_hostname):
+                hostname = future_to_hostname[future]
+                try:
+                    if future.result():
+                        print(f"Open SMTP server found at {hostname}")
+                        found_server = hostname.split(':')[0]
+                        port = int(hostname.split(':')[1] if ':' in hostname else port)
+                        break
+                    else:
+                        print(f"No SMTP server found at {hostname}")
+                except Exception as exc:
+                    print(f'Error checking {hostname}: {exc}')
+
+                except KeyboardInterrupt:
+                    print("\nProgram terminated by user. Exiting...")
+                    executor.shutdown(wait=False)
+                    return
 
         if found_server is not None:
             log_open_smtp_server(found_server, port)
